@@ -20,13 +20,13 @@
 #define BUT1_PIO      PIOD
 #define BUT1_PIO_ID   ID_PIOD
 #define BUT1_IDX  28
-#define BUT1_IDX_MASK (1 << BUT_IDX)
+#define BUT1_IDX_MASK (1 << BUT1_IDX)
 
 // Botão OLED 2
 #define BUT2_PIO      PIOC
 #define BUT2_PIO_ID   ID_PIOC
 #define BUT2_IDX  31
-#define BUT2_IDX_MASK (1 << BUT_IDX)
+#define BUT2_IDX_MASK (1 << BUT2_IDX)
 
 volatile char but_flag;
 volatile unsigned int but_frequency = 30;
@@ -117,8 +117,8 @@ void io_init(void)
   NVIC_EnableIRQ(BUT1_PIO_ID);
   NVIC_EnableIRQ(BUT2_PIO_ID);
   NVIC_SetPriority(BUT_PIO_ID, 4); // Prioridade 4
-  NVIC_SetPriority(BUT1_PIO_ID, 4);
-  NVIC_SetPriority(BUT2_PIO_ID, 4);
+  NVIC_SetPriority(BUT1_PIO_ID, 3);
+  NVIC_SetPriority(BUT2_PIO_ID, 3);
 }
 
 int main (void)
