@@ -21,6 +21,7 @@
 #define BUT1_PIO_ID   ID_PIOD
 #define BUT1_IDX  28
 #define BUT1_IDX_MASK (1 << BUT1_IDX)
+#define BUT1_WAIT_TIME 350
 
 // Botao OLED 2
 #define BUT2_PIO      PIOC
@@ -33,50 +34,63 @@
 #define BUT3_PIO_ID   ID_PIOA
 #define BUT3_IDX  19
 #define BUT3_IDX_MASK (1 << BUT3_IDX)
+#define BUT3_WAIT_TIME 500
 
-volatile char but_flag;
-volatile unsigned int but_delay = 100;
-volatile char oled_flag;
+volatile char but_flag = 0;
+volatile char but1_flag = 0;
+volatile char but2_flag = 0;
+volatile char but3_flag = 0;
+volatile char oled_flag = 0;
 
 void io_init(void);
-void pisca_led(int n, int t);
+int pisca_led(int n, int t, int i);
 void print_oled(unsigned int but_delay);
 
 void but_callback(void)
 {
 	but_flag = 1;
 	oled_flag = 1;
+	but2_flag = 0;
 }
 
 void but1_callback(void)
 {
-	if (pio_get(BUT1_PIO, PIO_INPUT, BUT1_IDX_MASK)) {
-		// PINO == 1 --> Borda de subida
-		but_delay -= 100;
-		} else {
-		// PINO == 0 --> Borda de descida
-		but_delay += 100;
+	if (!pio_get(BUT1_PIO, PIO_INPUT, BUT1_IDX_MASK)) {
+		but1_flag = 1;
+	} else {
+		but1_flag = 0;
 	}
 }
 
 void but2_callback(void) 
 {
-	but_flag = 0;
+	but2_flag = 1;
 }
 
 void but3_callback(void)
 {
-	but_delay -= 10;
+	if (!pio_get(BUT3_PIO, PIO_INPUT, BUT3_IDX_MASK)) {
+		but3_flag = 1;
+		} else {
+		but3_flag = 0;
+	}
 }
 
 // pisca led N vez no periodo T
-void pisca_led(int n, int t){
-  for (int i=0;i<n;i++){
+int pisca_led(int n, int t, int i){
+  for (;i<n;i++){
     pio_clear(LED_PIO, LED_IDX_MASK);
     delay_ms(t);
     pio_set(LED_PIO, LED_IDX_MASK);
     delay_ms(t);
+
+	gfx_mono_draw_rect(4 + 4*i, 15, 2, 10, GFX_PIXEL_SET);
+	
+	if (but2_flag) {
+		return i+1;
+	}
   }
+  return i;
 }
 
 void print_oled(unsigned int but_delay) {
@@ -137,7 +151,7 @@ void io_init(void)
   pio_handler_set(BUT3_PIO,
 				  BUT3_PIO_ID,
 				  BUT3_IDX_MASK,
-				  PIO_IT_FALL_EDGE,
+				  PIO_IT_EDGE,
 				  but3_callback);
 
   // Ativa interrupção e limpa primeira IRQ gerada na ativacao
@@ -179,18 +193,46 @@ int main (void)
 	
 	// Init OLED
 	gfx_mono_ssd1306_init();
-
+	
+	// Declare local variables
+	unsigned int but_delay = 100;
+	int i = 0;
+	
   /* Insert application code here, after the board has been initialized. */
 	while(1) {
 		if (oled_flag) {
 			print_oled(but_delay);
 			oled_flag = 0;
 		}
+		if (but2_flag) {
+			while (but2_flag) {}
+		}
 		if (but_flag) {
-			pisca_led(30, but_delay);
+			i = pisca_led(30, but_delay, i);
+			if (i >= 30) {
+				i = 0;
+				gfx_mono_draw_filled_rect(0, 15, 128, 10, GFX_PIXEL_CLR);
+			}
 			but_flag = 0;
 		}
-		
+		if (but1_flag) {
+			delay_ms(BUT1_WAIT_TIME);
+			if (but1_flag) {
+				but1_flag = 0;
+				but_delay += 100;
+			} else if (but_delay > 100) {
+				but_delay -= 100;
+			}
+			oled_flag = 1;	
+		}
+		if (but3_flag) {
+			delay_ms(BUT3_WAIT_TIME);
+			if (!but3_flag) {
+				but_delay += 100;
+			}
+			oled_flag = 1;
+		}
+
 		pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);			
 	}
 }
