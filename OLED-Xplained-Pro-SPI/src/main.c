@@ -44,7 +44,7 @@ volatile char oled_flag = 0;
 
 void io_init(void);
 int pisca_led(int n, int t, int i);
-void print_oled(unsigned int but_delay);
+void print_oled(int but_delay);
 
 void but_callback(void)
 {
@@ -93,12 +93,12 @@ int pisca_led(int n, int t, int i){
   return i;
 }
 
-void print_oled(unsigned int but_delay) {
+void print_oled(int but_delay) {
 	char freq_str[128];
-	sprintf(freq_str, "%d", 1000 / (2 * but_delay) );
+	sprintf(freq_str, "%d", 500 / but_delay );
 	gfx_mono_draw_string("Freq:", 0, 0, &sysfont);
 	gfx_mono_draw_string(freq_str, 50, 0, &sysfont);
-	gfx_mono_draw_string("Hz", 75, 0, &sysfont);
+	gfx_mono_draw_string("Hz", 70, 0, &sysfont);
 }
 
 void io_init(void)
@@ -195,7 +195,7 @@ int main (void)
 	gfx_mono_ssd1306_init();
 	
 	// Declare local variables
-	unsigned int but_delay = 100;
+	int but_delay = 100;
 	int i = 0;
 	
   /* Insert application code here, after the board has been initialized. */
