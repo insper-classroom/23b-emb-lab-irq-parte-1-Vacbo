@@ -17,6 +17,8 @@
 #define LED_IDX      8
 #define LED_IDX_MASK (1 << LED_IDX)
 
+#define BLINK_N      30
+
 // Botão
 #define BUT_PIO      PIOA
 #define BUT_PIO_ID   ID_PIOA
@@ -61,7 +63,7 @@ volatile char oled_flag = 0;
 
 void io_init(void);
 int pisca_led(int n, int t, int i);
-void print_oled(int but_delay);
+void print_freq_oled(int but_delay);
 
 /************************************************************************/
 /* handler / callbacks                                                  */
@@ -69,8 +71,7 @@ void print_oled(int but_delay);
 
 void but_callback(void)
 {
-	but_flag = 1;
-	oled_flag = 1;
+	but_flag = oled_flag = 1;
 	but2_flag = 0;
 }
 
@@ -92,7 +93,7 @@ void but3_callback(void)
 {
 	if (!pio_get(BUT3_PIO, PIO_INPUT, BUT3_IDX_MASK)) {
 		but3_flag = 1;
-		} else {
+	} else {
 		but3_flag = 0;
 	}
 }
@@ -104,13 +105,16 @@ void but3_callback(void)
 // pisca led N vez no periodo T
 int pisca_led(int n, int t, int i){
   for (;i<n;i++){
+	// Blink LED
     pio_clear(LED_PIO, LED_IDX_MASK);
     delay_ms(t);
     pio_set(LED_PIO, LED_IDX_MASK);
     delay_ms(t);
 
+	// Print progress bar
 	gfx_mono_draw_rect(4 + 4*i, 15, 2, 10, GFX_PIXEL_SET);
 	
+	// Check if button 2 was pressed
 	if (but2_flag) {
 		return i+1;
 	}
@@ -118,12 +122,11 @@ int pisca_led(int n, int t, int i){
   return i;
 }
 
-void print_oled(int but_delay) {
+void print_freq_oled(int but_delay) {
 	char freq_str[128];
-	sprintf(freq_str, "%d", 500 / but_delay );
+	sprintf(freq_str, " %.2lf Hz", (double) 500 / but_delay );
 	gfx_mono_draw_string("Freq:", 0, 0, &sysfont);
 	gfx_mono_draw_string(freq_str, 50, 0, &sysfont);
-	gfx_mono_draw_string("Hz", 70, 0, &sysfont);
 }
 
 void io_init(void)
@@ -141,12 +144,12 @@ void io_init(void)
 
     // Configura PIO para lidar com o pino do botão como entrada
     // com pull-up
-	pio_configure(BUT_PIO, PIO_INPUT, BUT_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_configure(BUT_PIO, PIO_INPUT, BUT_IDX_MASK,   PIO_PULLUP | PIO_DEBOUNCE);
 	pio_configure(BUT1_PIO, PIO_INPUT, BUT1_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_configure(BUT2_PIO, PIO_INPUT, BUT2_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	pio_configure(BUT3_PIO, PIO_INPUT, BUT3_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
 	
-	pio_set_debounce_filter(BUT_PIO, BUT_IDX_MASK, 60);
+	pio_set_debounce_filter(BUT_PIO, BUT_IDX_MASK,   60);
 	pio_set_debounce_filter(BUT1_PIO, BUT1_IDX_MASK, 60);
 	pio_set_debounce_filter(BUT2_PIO, BUT2_IDX_MASK, 60);
 	pio_set_debounce_filter(BUT3_PIO, BUT3_IDX_MASK, 60);
@@ -198,7 +201,7 @@ void io_init(void)
 	NVIC_EnableIRQ(BUT2_PIO_ID);
 	NVIC_EnableIRQ(BUT3_PIO_ID);
 	
-	NVIC_SetPriority(BUT_PIO_ID, 4); // Prioridade 4
+	NVIC_SetPriority(BUT_PIO_ID,  4); // Prioridade 4
 	NVIC_SetPriority(BUT1_PIO_ID, 3);
 	NVIC_SetPriority(BUT2_PIO_ID, 1);
 	NVIC_SetPriority(BUT3_PIO_ID, 3);
@@ -226,21 +229,25 @@ int main (void)
 	// Declare local variables
 	int but_delay = 100;
 	int i = 0;
+
+	// Print initial frequency
+	print_freq_oled(but_delay);
 	
   /* Insert application code here, after the board has been initialized. */
 	while(1) {
 		if (oled_flag) {
-			print_oled(but_delay);
+			print_freq_oled(but_delay);
 			oled_flag = 0;
 		}
 		if (but2_flag) {
 			while (but2_flag) {}
 		}
 		if (but_flag) {
-			i = pisca_led(30, but_delay, i);
-			if (i >= 30) {
+			i = pisca_led(BLINK_N, but_delay, i);
+			
+			if (i >= BLINK_N) {
 				i = 0;
-				gfx_mono_draw_filled_rect(0, 15, 128, 10, GFX_PIXEL_CLR);
+				gfx_mono_draw_filled_rect(0, 15, 128, 10, GFX_PIXEL_CLR); // Clear progress bar
 			}
 			but_flag = 0;
 		}
@@ -252,16 +259,15 @@ int main (void)
 			} else if (but_delay > 100) {
 				but_delay -= 100;
 			}
-			oled_flag = 1;	
+			print_freq_oled(but_delay); // Update frequency	
 		}
 		if (but3_flag) {
 			delay_ms(BUT3_WAIT_TIME);
 			if (!but3_flag) {
 				but_delay += 100;
 			}
-			oled_flag = 1;
+			print_freq_oled(but_delay); // Update frequency	
 		}
-
 		pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);			
 	}
 }
